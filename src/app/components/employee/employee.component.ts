@@ -1,10 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
+import {Component, Input, OnInit} from '@angular/core';
 import { OnDestroy } from '@angular/core';
 import { Subscription } from 'rxjs/Subscription';
+import 'rxjs/add/operator/switchMap';
 
 import { EmployeeService } from '../../services/employee.service';
 import { Employee } from '../../models/emploee.model';
+import {ActivatedRoute} from '@angular/router';
 
 @Component({
   selector: 'app-employee',
@@ -13,24 +15,37 @@ import { Employee } from '../../models/emploee.model';
 })
 export class EmployeeComponent implements OnInit, OnDestroy {
 
-  employees: Employee[];
+  employees: Employee[] = [];
+  employeesFiltered: Employee[] = [];
   employeeSub: Subscription;
+  departmentId: number;
 
-  constructor(public employeeService: EmployeeService) { }
+  constructor(public employeeService: EmployeeService,
+              private route: ActivatedRoute) { }
 
   ngOnInit() {
-    this.employeeSub = this.employeeService.getEmployeesAll()
-      .subscribe(
-        // Success responses
-        employees => this.employees = employees,
-        (err: HttpErrorResponse) => {
-          if (err.error instanceof Error) {
-            // A client-side or network error occurred. Handle it accordingly.
-            console.log('An error occured: ', err.error.message);
-          }
-        }
-      );
+    this.populateEmployees();
   }
+
+  private populateEmployees() {
+    this.employeeSub = this.employeeService
+      .getEmployeesAll()
+      .switchMap(employees => {
+        this.employees = employees;
+        return this.route.paramMap;
+      })
+      .subscribe(params => {
+        this.departmentId = +params.get('id');
+        this.applyFilter();
+      });
+  }
+
+    private applyFilter() {
+      this.employeesFiltered = (this.departmentId) ?
+        this.employees.filter(empl => empl.departmentId === this.departmentId) :
+        this.employees;
+    }
+
 
   ngOnDestroy() {
     this.employeeSub.unsubscribe();
